@@ -3,20 +3,20 @@
 ## 1. 构建依赖
 
 - Node.js 22+、npm 10+
-- Visual Studio Build Tools 2022/2026
-- MSVC x64 与 Windows 10/11 SDK
-- CMake 3.24+
+- Visual Studio Build Tools 2022/2026，或 MinGW-w64 GCC 13+ 与 Ninja
+- MSVC x64 与 Windows 10/11 SDK（仅 MSVC 构建）
+- CMake 3.28+
 - Python（仅图标生成）
 - Npcap SDK（仅物理后端）
-- SOEM v2.0.0 源码（仅物理后端）
+- SOEM v2.0.0 源码（已包含在 `third_party/SOEM`）
 
 当前已验证环境：
 
-- Node.js 24.14.0
-- npm 11.9.0
-- Visual Studio 2026 Build Tools
-- Windows SDK 10.0.26100
-- CMake 4.1.2
+- Node.js 24.16.0
+- npm 11.13.0
+- MinGW-w64 GCC 13.1.0 与 Ninja
+- CMake 4.1.0
+- Npcap SDK 1.16（运行时为 Npcap 1.89）
 - SOEM v2.0.0，commit `304d1c05eab77dc0d426f1a5cf09c8cc7dc03713`
 
 ## 2. 默认模拟包
@@ -54,14 +54,9 @@ third_party/SOEM/     SOEM v2.0.0
 .cache/npcap-sdk/     Npcap SDK
 ```
 
-显式声明许可模式：
+Npcap SDK 下载和解压方式见 [README 依赖章节](../README.md#依赖)。SDK 只用于构建；最终用户仍需自行安装 Npcap 运行时。
 
-```powershell
-$env:ECAT_SOEM_LICENSE_MODE="commercial"
-npm run package:win:soem
-```
-
-或：
+本项目以 `GPL-3.0-only` 发布，物理包使用 SOEM 的 GPLv3 选项。显式确认发布模式：
 
 ```powershell
 $env:ECAT_SOEM_LICENSE_MODE="gpl"
@@ -70,16 +65,18 @@ npm run package:win:soem
 
 脚本会：
 
-1. 拒绝未声明许可模式的构建。
-2. 构建 Renderer。
-3. 使用 SOEM 和 Npcap SDK 构建原生核心。
-4. 生成解包应用、NSIS 与 Portable 包。
-5. 写入 `artifacts/soem-package-manifest.json`，记录许可模式、SOEM commit 和 SDK 路径。
+1. 拒绝未设置 `gpl` 许可模式的构建。
+2. 检查项目 `GPL-3.0-only` 声明、完整 GPL 文本和所有第三方许可证文件。
+3. 构建 Renderer。
+4. 使用 SOEM 和 Npcap SDK 构建原生核心。
+5. 生成解包应用、NSIS 与 Portable 包。
+6. 验证许可证和说明文件已进入解包应用。
+7. 写入 `artifacts/soem-package-manifest.json`，记录项目版本、许可模式、SOEM commit 和 SDK 路径。
 
 只生成解包目录：
 
 ```powershell
-$env:ECAT_SOEM_LICENSE_MODE="commercial"
+$env:ECAT_SOEM_LICENSE_MODE="gpl"
 powershell -ExecutionPolicy Bypass -File scripts/package-soem.ps1 -DirectoryOnly
 ```
 
@@ -101,23 +98,21 @@ powershell -ExecutionPolicy Bypass -File scripts/package-soem.ps1 -DirectoryOnly
 - 在使用 OEM 再分发授权时遵守 Npcap 条款。
 - 在网卡枚举为空时提示检查 Npcap、管理员权限和接口状态。
 
-## 5. SOEM 许可
+## 5. 项目与 SOEM 许可
 
-SOEM v2.0.0 为 GPLv3/商业双许可。物理包脚本只做显式许可模式门禁，不自动完成法律合规。
+ECAT Bench 使用 `GPL-3.0-only`。SOEM v2.0.0 为 GPLv3/商业双许可，本项目通过其 GPLv3 选项链接和分发。发布物理包时必须同时提供对应 tag 的完整源码，GitHub Release 中应包含源码压缩包。
 
 ### GPL 模式
 
-- 项目必须采用 GPLv3 兼容许可证。
+- 项目许可证为 `GPL-3.0-only`。
 - 必须向接收者提供完整对应源码和构建方式。
 - 必须保留 SOEM 版权与许可证文本。
-- 必须确认 Electron、Npcap 和其他依赖的分发条款。
+- 必须随应用分发 Electron、Chromium、React、Lucide 和 nlohmann/json 的许可证文本。
+- Npcap 不随应用分发，最终用户自行安装并遵守 Npcap 条款。
 
 ### 商业模式
 
-- 必须取得 RT-Labs 的适用商业许可。
-- 保留商业许可证明和发布范围记录。
-
-项目当前 `package.json` 仍为 `UNLICENSED`。在许可证决策完成前，不应公开发布包含 SOEM 的安装包。
+当前公开发布不使用商业模式。若未来需要闭源分发，必须取得 RT-Labs 的适用商业许可，并重新审查整个项目的许可证，不能仅修改打包脚本中的许可模式。
 
 ## 6. 依赖安全
 
@@ -166,11 +161,25 @@ npm run test:packaged
 物理包另需：
 
 ```powershell
-npm run native:build -- -EnableSoem -SoemRoot third_party/SOEM -NpcapRoot .cache/npcap-sdk
-npm run test:soem
+$env:ECAT_SOEM_LICENSE_MODE="gpl"
+npm run package:win:soem
 ```
 
-真实硬件、1 ms 实时性、SDO、PDO 和 FoE 必须按 [测试计划](test-plan.md) 单独验收，不能用安装包冒烟测试代替。
+打包后验证：
+
+```powershell
+npm run native:build -- -EnableSoem -SoemRoot third_party/SOEM -NpcapRoot .cache/npcap-sdk
+npm run test:soem
+npm run test:packaged
+```
+
+发布时还应生成源码压缩包和 `SHA256SUMS.txt`。真实硬件、1 ms 实时性、SDO、PDO 和 FoE 必须按 [测试计划](test-plan.md) 单独验收，不能用安装包冒烟测试代替。
+
+`v0.2.0` 的 Release 资产命名：
+
+- `ECAT-Bench-v0.2.0-win-x64-portable.zip`
+- `ECAT-Bench-v0.2.0-source.zip`
+- `SHA256SUMS.txt`
 
 ## 10. 跨平台
 

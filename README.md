@@ -9,33 +9,117 @@
 | React/Electron 桌面操作台 | 可运行 |
 | Electron 主进程与原生核心 | SOEM 优先，失败后回退原生模拟核心或 TypeScript 模拟核心 |
 | SOEM v2 物理后端 | 已编译；NPF 网卡枚举已通过 |
-| 真实从站扫描、OP、SDO、PDO、FoE | 代码路径已接入，尚未在真实从站上验收 |
+| 真实从站扫描与 OP | 已使用 Renesas EtherCAT RA8 2port 验证，WKC 3/3 |
+| SDO、PDO、FoE | 代码路径已接入，尚未在真实从站上验收 |
 | 原生 JSON-Lines 模拟核心 | 已编译并通过冒烟测试 |
 | PDO 原始字节观察/写入 | SOEM 进程映像已接入，单次最多显示 256 字节 |
 | ENI 固定映射 | 仅登记文件路径；PDO 仍使用 SOEM 自动映射 |
 | OP 下 SDO/FoE 邮箱 | SOEM cyclic mailbox 路径已接入；尚未在真实从站上验收 |
 | Windows 1 ms 周期 | 已内置直方图和报告脚本；尚未在真实拓扑上完成 30 分钟验收 |
 
-当前工作区没有已知的真实 EtherCAT 从站。网卡枚举成功不等于 OP、SDO、PDO 或 FoE 已通过真实硬件验证。
+当前已验证扫描和 OP；网卡枚举或 OP 成功不代表 SDO、PDO、FoE 或 30 分钟实时性能已经验收。
+
+## 依赖
+
+### 最终用户运行依赖
+
+| 依赖 | 是否必需 | 说明 |
+| --- | --- | --- |
+| Windows 10/11 x64 | 必需 | 当前正式支持平台 |
+| Npcap 运行时 | 物理 SOEM 模式必需 | 提供 `wpcap.dll` 和 NPF 网卡接口；模拟模式不需要 |
+| 专用以太网网卡 | 物理模式必需 | 推荐 PCIe 或 USB 3.0 网卡；不要让 TwinCAT 同时占用 |
+| SOEM 运行时 | 不需要单独安装 | 已编译进 `ecat-core.exe` |
+
+应用不捆绑 Npcap 安装器或 DLL，因为 Npcap 有独立的再分发许可。最终用户需要自行从 [Npcap 官网](https://npcap.com/#download) 下载安装。建议在安装器中启用 `Install Npcap in WinPcap API-compatible Mode`，当前工作区已使用 Npcap `Packet.dll 1.89` 验证。
+
+安装后可用以下命令确认驱动正在运行：
+
+```powershell
+sc.exe query npcap
+```
+
+如果 Npcap 安装时启用了“仅管理员访问”，运行 ECAT Bench 时也需要管理员权限。
+
+### Windows 免安装版
+
+从 GitHub Releases 下载 `ECAT-Bench-v0.2.0-win-x64-portable.zip`，完整解压后直接运行
+`ECAT Bench.exe`。不需要安装 ECAT Bench，也不需要单独安装 Node.js、CMake 或 SOEM。
+
+- 只使用模拟功能时，解压即可运行。
+- 连接真实 EtherCAT 从站前，仍需按上面的说明安装 Npcap 运行时。
+- 请勿只从压缩包中拖出主程序运行；原生核心和许可证文件位于应用目录内。
+- Release 同时提供源码压缩包和 `SHA256SUMS.txt`，便于核对下载内容。
+
+### 源码构建依赖
+
+| 依赖 | 是否必需 | 说明 |
+| --- | --- | --- |
+| Node.js 22+、npm 10+ | 必需 | 安装 Electron、React、Vite 等依赖 |
+| CMake 3.28+ | 物理后端必需 | SOEM 2.0 要求 CMake 3.28+ |
+| MSVC Build Tools 2022/2026 | 二选一 | 安装“使用 C++ 的桌面开发”和 Windows SDK |
+| MinGW-w64 GCC 13+ 与 Ninja | 二选一 | 无 MSVC 时的回退构建链，已验证 GCC 13.1 + Ninja |
+| Npcap SDK 1.16 | 物理后端编译必需 | 只在构建时使用，最终用户不需要 |
+| SOEM v2.0.0 源码 | 已包含 | 位于 `third_party/SOEM`，不需要单独下载 |
+| Python 3 | 可选 | 仅在生成应用图标和打包时使用 |
+
+Npcap SDK 可从 [Npcap SDK 1.16](https://npcap.com/dist/npcap-sdk-1.16.zip) 下载。放到项目约定的目录：
+
+```powershell
+New-Item -ItemType Directory -Force .cache | Out-Null
+Invoke-WebRequest `
+  -Uri "https://npcap.com/dist/npcap-sdk-1.16.zip" `
+  -OutFile ".cache/npcap-sdk-1.16.zip"
+Expand-Archive `
+  -LiteralPath ".cache/npcap-sdk-1.16.zip" `
+  -DestinationPath ".cache/npcap-sdk" `
+  -Force
+```
+
+解压后应至少存在：
+
+```text
+.cache/npcap-sdk/Include/pcap.h
+.cache/npcap-sdk/Lib/x64/wpcap.lib
+.cache/npcap-sdk/Lib/x64/Packet.lib
+```
+
+`.cache/` 和 `native/build/` 都是本地生成目录，不进入 Git。
+
+如果 PowerShell 报错 `npm.ps1 cannot be loaded because running scripts is disabled`，可把命令中的 `npm` 换成 `npm.cmd`，例如 `npm.cmd run dev`。也可以在确认符合公司安全策略后执行：
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
 
 ## 快速启动
 
-环境要求：
-
-- Node.js 22+、npm 10+
-- Windows 10/11 x64
-- Visual Studio Build Tools 2022/2026、Windows SDK、CMake 3.24+
-- 物理后端另需 Npcap 运行时、Npcap SDK 和 SOEM v2 源码
+只运行模拟界面：
 
 ```powershell
 npm install
+npm run dev:web
+```
+
+物理 SOEM 模式需要先安装 Npcap 运行时、准备 Npcap SDK，然后构建原生核心：
+
+```powershell
+npm install
+npm run native:build -- `
+  -EnableSoem `
+  -SoemRoot third_party/SOEM `
+  -NpcapRoot .cache/npcap-sdk
+npm run test:soem
+$env:ECAT_CORE_MODE="soem"
 npm run dev
 ```
 
-浏览器模式只使用 TypeScript 模拟核心：
+启动后确认界面顶部显示 `SOEM` 而不是 `SIM`。浏览器中的 `npm run dev:web` 只使用 TypeScript 模拟核心，不能连接真实从站。
+
+如果原生核心或 Npcap 不可用，Electron 会按 `SOEM -> 原生模拟核心 -> TypeScript 模拟核心` 的顺序回退。需要强制物理模式时设置 `ECAT_CORE_MODE=soem`。
 
 ```powershell
-npm run dev:web
+$env:ECAT_CORE_MODE="soem"
+npm run dev
 ```
 
 ## 构建与测试
@@ -61,12 +145,13 @@ npm run test:soem
 `test:soem` 只验证 SOEM 模式启动、网卡枚举和返回结构。真实总线基础验证需设置网卡标识后显式执行：
 
 ```powershell
-$env:ECAT_SOEM_ADAPTER="Realtek PCIe GbE Family Controller"
+$env:ECAT_SOEM_ADAPTER="Realtek USB GbE Family Controller"
 $env:ECAT_CYCLE_US="1000"
+$env:ECAT_AUTO_OP="1"
 npm run test:hardware
 ```
 
-该脚本只执行扫描并报告从站与状态，不代表 1 ms 实时性、OP、SDO 或 FoE 验收通过。
+`ECAT_AUTO_OP=1` 时会验证从站保持在 `OP` 且 `WKC > 0`。设置 `ECAT_AUTO_OP=0` 可只扫描并停留在 `PRE-OP/SAFE-OP`。该脚本不代表 1 ms 实时性、SDO、PDO 或 FoE 验收通过。
 
 ## 1 ms 实时基准
 
@@ -116,14 +201,14 @@ npm run package:win
 
 打包使用 `node_modules/electron/dist` 中已安装的 Electron 运行时，不依赖构建时重新访问 GitHub 校验清单。
 
-物理后端包必须显式声明 SOEM 许可模式：
+本项目采用 `GPL-3.0-only`。物理后端包必须显式确认 SOEM 的 GPL 发布模式：
 
 ```powershell
-$env:ECAT_SOEM_LICENSE_MODE="commercial"
+$env:ECAT_SOEM_LICENSE_MODE="gpl"
 npm run package:win:soem
 ```
 
-也可设置为 `gpl`，但必须同时满足 GPLv3 的完整对应源码与项目许可证要求。SOEM v2.0.0 为 GPLv3/商业双许可，项目当前仍标记为 `UNLICENSED`，不能未经决策直接公开发布物理后端包。
+脚本会检查项目许可证、SOEM 与运行时依赖的许可证文本，并确认它们被放入解包应用。发布时应同时提供对应版本的源码包；GPLv3 的完整文本见 [LICENSE](LICENSE)，第三方组件说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 Npcap 运行时和 SDK 不随应用打包。最终用户需要单独安装兼容的 Npcap；发布方必须自行确认 Npcap 的再分发和 OEM 条款。
 
@@ -138,7 +223,14 @@ native/soem-core/      独立 C++20 主站核心
 scripts/               开发、构建、硬件冒烟与打包脚本
 docs/                  需求、架构、协议、测试与打包说明
 third_party/           SOEM v2.0.0、nlohmann/json 及其许可证
+licenses/              发布包附带的第三方许可证文本
 ```
+
+## 许可证
+
+ECAT Bench 以 `GPL-3.0-only` 发布。SOEM v2.0.0 通过其 GPLv3 选项链接；Electron、Chromium、React、Lucide 和 nlohmann/json 的许可证文本随应用一同分发。Npcap 不包含在本项目中，用户需遵守 Npcap 自身的许可条款。
+
+版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 关键限制
 

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import readline from "node:readline";
+import { setTimeout as delay } from "node:timers/promises";
 
 const adapterRef = process.env.ECAT_SOEM_ADAPTER?.trim();
 if (!adapterRef) {
@@ -114,8 +115,25 @@ try {
 
   const scanned = await command("scan", {}, 120_000);
   assert(scanned.ok, scanned.message);
-  const snapshot = await command("get_snapshot");
+  let snapshot = await command("get_snapshot");
   assert(snapshot.ok, snapshot.message);
+  if (autoTransitionOp) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (snapshot.data.telemetry.wkc > 0) {
+        break;
+      }
+      await delay(100);
+      snapshot = await command("get_snapshot");
+    }
+    assert(
+      snapshot.data.telemetry.wkc > 0,
+      "Cyclic process data returned WKC=0 after entering OP"
+    );
+    assert(
+      snapshot.data.slaves.every((slave) => slave.state === "OP"),
+      "Not all slaves remained in OP"
+    );
+  }
   assert(snapshot.data.slaves.length > 0, "Scan returned no slaves");
 
   console.log(

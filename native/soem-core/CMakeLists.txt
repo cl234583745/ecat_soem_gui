@@ -1,10 +1,11 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.28)
 
-project(ecat_core VERSION 0.1.0 LANGUAGES CXX)
+project(ecat_core VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 option(ECAT_ENABLE_SOEM "Build the physical EtherCAT backend with SOEM" OFF)
 set(ECAT_SOEM_ROOT
@@ -40,6 +41,24 @@ if(MSVC)
   )
 else()
   target_compile_options(ecat-core PRIVATE -Wall -Wextra -Wpedantic)
+  if(MINGW)
+    # Npcap 1.16 headers use this newer SAL annotation, but mingw-w64's
+    # sal.h does not define it.
+    target_compile_definitions(ecat-core PRIVATE _Post_invalid_=)
+    get_filename_component(ECAT_MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    foreach(runtime_dll IN ITEMS
+        libgcc_s_seh-1.dll
+        libstdc++-6.dll
+        libwinpthread-1.dll)
+      if(EXISTS "${ECAT_MINGW_BIN_DIR}/${runtime_dll}")
+        add_custom_command(TARGET ecat-core POST_BUILD
+          COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${ECAT_MINGW_BIN_DIR}/${runtime_dll}"
+            "$<TARGET_FILE_DIR:ecat-core>/${runtime_dll}"
+        )
+      endif()
+    endforeach()
+  endif()
 endif()
 
 if(WIN32)

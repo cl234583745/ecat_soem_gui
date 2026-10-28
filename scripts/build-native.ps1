@@ -12,12 +12,17 @@ $root = Split-Path -Parent $PSScriptRoot
   -SoemRoot $SoemRoot `
   -NpcapRoot $NpcapRoot
 
-$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-$vsRoot = & $vswhere -latest -products * -property installationPath
-$cmake = Join-Path $vsRoot "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+$cmakeCommand = Get-Command cmake.exe -ErrorAction SilentlyContinue
+if ($cmakeCommand) {
+  $cmake = $cmakeCommand.Source
+} else {
+  $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+  $vsRoot = & $vswhere -latest -products * -property installationPath
+  $cmake = Join-Path $vsRoot "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+}
 $buildDir = Join-Path $root "native\build"
 
-& $cmake --build $buildDir --config Release
+& $cmake --build $buildDir --config Release --parallel
 if ($LASTEXITCODE -ne 0) {
   throw "Native core build failed with exit code $LASTEXITCODE."
 }

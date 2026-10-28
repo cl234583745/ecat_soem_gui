@@ -1,11 +1,11 @@
 {
   "name": "ecat-bench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Compact EtherCAT master commissioning console",
   "main": "dist-electron/main/main.js",
   "author": "ECAT Bench Contributors",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-only",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite --host 127.0.0.1",
@@ -72,14 +72,31 @@
         "filter": [
           "**/*"
         ]
+      }
+    ],
+    "extraFiles": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
       },
       {
         "from": "THIRD_PARTY_NOTICES.md",
         "to": "THIRD_PARTY_NOTICES.md"
       },
       {
-        "from": "third_party/SOEM/LICENSE.md",
-        "to": "licenses/SOEM-LICENSE.md"
+        "from": "README.md",
+        "to": "README.md"
+      },
+      {
+        "from": "CHANGELOG.md",
+        "to": "CHANGELOG.md"
+      },
+      {
+        "from": "licenses",
+        "to": "licenses",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
