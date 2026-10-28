@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-electron/
+release/
+release-next/
+coverage/
+artifacts/
+native/build/
+*.log
+*.tsbuildinfo
+.vite/
+.cache/
+.DS_Store
+Thumbs.db

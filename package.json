@@ -1,0 +1,103 @@
+{
+  "name": "ecat-bench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Compact EtherCAT master commissioning console",
+  "main": "dist-electron/main/main.js",
+  "author": "ECAT Bench Contributors",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "npm run typecheck && vite build && tsc -p tsconfig.main.json",
+    "assets:icons": "python scripts/generate-icons.py",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "test:native": "node scripts/native-smoke.mjs",
+    "test:soem": "node scripts/soem-smoke.mjs",
+    "test:benchmark": "node --test scripts/benchmark-assessment.test.mjs",
+    "test:hardware": "node scripts/hardware-smoke.mjs",
+    "benchmark:1ms": "node scripts/realtime-benchmark.mjs --duration 60",
+    "benchmark:30m": "node scripts/realtime-benchmark.mjs --duration 1800",
+    "test:electron": "node scripts/electron-smoke.mjs",
+    "test:packaged": "node scripts/packaged-smoke.mjs",
+    "package:win": "npm run package:dir && electron-builder --prepackaged release/win-unpacked --win nsis portable",
+    "package:win:soem": "powershell -ExecutionPolicy Bypass -File scripts/package-soem.ps1",
+    "package:dir": "npm run assets:icons && npm run build && npm run native:build && electron-builder --dir && node scripts/patch-win-exe.mjs",
+    "audit": "npm audit",
+    "audit:prod": "npm audit --omit=dev",
+    "native:configure": "powershell -ExecutionPolicy Bypass -File scripts/configure-native.ps1",
+    "native:build": "powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
+    "playwright-core": "^1.50.0",
+    "rcedit": "^5.0.2",
+    "typescript": "^5.7.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "build": {
+    "appId": "io.ecatbench.desktop",
+    "productName": "ECAT Bench",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "build/icon.png",
+      "build/icon.ico",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "native/build/bin",
+        "to": "native",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "third_party/SOEM/LICENSE.md",
+        "to": "licenses/SOEM-LICENSE.md"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-setup-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable-${arch}.${ext}"
+    }
+  }
+}
